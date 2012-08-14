@@ -44,6 +44,8 @@
 #include <boost/asio.hpp>
 using namespace::boost::asio;
 
+#include "cpr_InputKeyboard.h"
+
 //#include <ros/ros.h>
 //#include <geometry_msgs/Twist.h>
 //#include <sensor_msgs/JointState.h>
@@ -70,7 +72,7 @@ public:
 
 	msg msgBuffer[256];
 
-
+	cpr_InputKeyboard * keys;
   	
 
 

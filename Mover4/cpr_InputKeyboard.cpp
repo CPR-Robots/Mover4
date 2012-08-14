@@ -62,11 +62,6 @@ void keyLoop(void * context )
 	ctx = (cpr_InputKeyboard*)context;
 
 
-	(void) initscr();      // init the curses library
-	keypad(stdscr, TRUE);  // enable keyboard mapping
-	(void) nonl();         // tell curses not to do NL->CR/NL on output
-	(void) cbreak();       // take input chars one at a time, no wait for \n ; necessary for moving the robot
-	(void) noecho();        // do not echo input
 
     char c;
 
@@ -89,10 +84,10 @@ void keyLoop(void * context )
     	mvprintw(10,26, "%.1lf", ctx->currJoints[2]);
     	mvprintw(10,38, "%.1lf", ctx->currJoints[3]);
 
-    	mvprintw(12, 2, "Status: %s", ctx->statusString);
 
-    	mvprintw(14, 2, "Reset errors and enable:    p");
-    	mvprintw(15, 2, "Set joint position to zero: z");
+    	mvprintw(14, 2, "Reset errors and enable: p - Set joint positions to zero: z");
+
+
 
 
     	c = getch();
@@ -119,7 +114,7 @@ void keyLoop(void * context )
 
 
 //***************************************************************
-void cpr_InputKeyboard::GetMotionVec(double * v, bool reset, bool zero){
+void cpr_InputKeyboard::GetMotionVec(double * v){
 
 	for(int i=0; i<6; i++){
 		v[i] = motionVec[i];
@@ -134,10 +129,6 @@ void cpr_InputKeyboard::GetMotionVec(double * v, bool reset, bool zero){
 		}
 	}
 
-	reset = flagReset;
-	zero = flagZero;
-	flagReset = false;
-	flagZero = false;
 
 	return;
 }
@@ -154,11 +145,56 @@ void cpr_InputKeyboard::SetJoints(double * sj, double * cj){
 
 }
 
+//***************************************************************
+void cpr_InputKeyboard::UpdateMessages(){
+
+	mvprintw(12, 2, "Status: %s", statusString.c_str());
+	mvprintw(16, 2, "Messages:");
+	for(int i=0; i<5; i++){
+		int nr = indexMsg-1-i;
+		if(nr<0) nr+=5;
+		mvprintw(17+i, 5, "                                                 ");
+		mvprintw(17+i, 5, messages[nr].c_str());
+	}
+	refresh();
+	return;
+}
+
+//***************************************************************
+void cpr_InputKeyboard::SetStatus(string msg){
+	statusString.clear();
+	statusString.append(msg);
+	mvprintw(12, 2, "                                                ");
+	mvprintw(12, 2, "Status: %s", statusString.c_str());
+	refresh();
+	return;
+}
+
+//***************************************************************
+void cpr_InputKeyboard::SetMessage(string msg){
+
+	messages[indexMsg].clear();
+	messages[indexMsg].append(msg);
+	indexMsg++;
+	if(indexMsg > 4)
+		indexMsg = 0;
+
+	UpdateMessages();
+	return;
+}
+
 
 
 //***************************************************************
 cpr_InputKeyboard::cpr_InputKeyboard()
 {
+	(void) initscr();      // init the curses library
+	keypad(stdscr, TRUE);  // enable keyboard mapping
+	(void) nonl();         // tell curses not to do NL->CR/NL on output
+	(void) cbreak();       // take input chars one at a time, no wait for \n ; necessary for moving the robot
+	(void) noecho();        // do not echo input
+
+
 	boost::thread keyThread(keyLoop, (void*)this);
 
 	for (int i=0; i<6; i++ )
@@ -167,6 +203,11 @@ cpr_InputKeyboard::cpr_InputKeyboard()
 	statusString[0] = 'n';
 	statusString[1] = '/';
 	statusString[2] = 'a';
+
+	for(int i=0; i<5; i++)
+		messages[i] = ".";
+
+	indexMsg = 0;
 
 }
 

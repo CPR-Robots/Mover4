@@ -48,6 +48,7 @@ struct robotState
 {
 	double p[6];
 	double j[4];
+	int errorCode[4];
 };
 
 

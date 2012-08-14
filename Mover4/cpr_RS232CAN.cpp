@@ -38,6 +38,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string>
 #include <iostream>
 #include <stdexcept>
 #include <boost/system/system_error.hpp>
@@ -138,7 +139,9 @@ bool cpr_RS232CAN::Connect(void )
 		port->set_option(baud_option); // set the baud rate
 
 		active = true;
-		std::cerr << "Port " << PORT << " opened\n";
+		//std::cerr << "Port " << PORT << " opened\n";
+		string s = "Port" + string(PORT) + "opened successfully";
+		keys->SetMessage(s);
 
 	}catch (boost::system::system_error &e){
 		boost::system::error_code ec = e.code();
@@ -181,8 +184,8 @@ int cpr_RS232CAN::EvaluateBuffer(char* buf){
 			msgBuffer[mid].data[i] = buf[i+2];
 		//std::cout << "found good msg\n";
 	}else{
-		std::cerr << "found bad msg\n";
-
+		//std::cerr << "found bad msg\n";
+		//keys->SetMessage("found bad message");
 	}
 
 	return 0;

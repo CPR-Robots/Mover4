@@ -61,6 +61,7 @@
 
 #include "boost/date_time/posix_time/posix_time.hpp"
 #include "boost/date_time/gregorian/gregorian.hpp"
+#include <boost/lexical_cast.hpp>
 #include <iostream>
 
 
@@ -82,6 +83,7 @@ public:
 	void ResetJointsToZero();
 	void ResetError();
 	void EnableMotors();
+	void DisableMotors();
 
 private:
   	
@@ -113,8 +115,12 @@ cprMover4HW::cprMover4HW()
 	jointIDs[2] = 48;
 	jointIDs[3] = 64;
 
+	itf.keys = &keyboard;
+
+
 	itf.Connect();
- 
+
+
 	
 }
 
@@ -128,20 +134,20 @@ void cprMover4HW::DoComm(){
 
 
 	double v[6];
-	keyboard.GetMotionVec(v, flagRequestReset, flagRequestZero);	// Get the user input
+	keyboard.GetMotionVec(v);										// Get the user input
 	kin.SetMotionVec(v);											// forward user input to the kinematic
 	kin.moveJoint();												// compute next set point position (could also be cartesian)
 	keyboard.SetJoints(kin.setPointState.j, kin.currState.j);		// and hand back for visualization
 
 
-	if(flagRequestReset){
-		flagRequestReset = false;
+	if(keyboard.flagReset){
+		keyboard.flagReset = false;
 		ResetError();
 		EnableMotors();
 	}
 
-	if(flagRequestZero){
-		flagRequestZero = false;
+	if(keyboard.flagZero){
+		keyboard.flagZero = false;
 		ResetJointsToZero();
 	}
 
@@ -160,7 +166,16 @@ void cprMover4HW::DoComm(){
 		itf.GetMsg(jointIDs[i]+1, &l, data);
 		tics = (256 * ((int)((unsigned char)data[2]))) + ((unsigned int)((unsigned char)data[3]));
 		kin.currState.j[i] = kin.computeJointPos(tics);
+		kin.currState.errorCode[i] = (int)data[0];
 	}
+
+
+	string s = boost::lexical_cast<string>( kin.currState.errorCode[0] );
+	s += " " + boost::lexical_cast<string>( kin.currState.errorCode[1] );
+	s += " " + boost::lexical_cast<string>( kin.currState.errorCode[2] );
+	s += " " + boost::lexical_cast<string>( kin.currState.errorCode[3] );
+	keyboard.SetStatus(s);
+
 
 	//std::cout << "joints: "<< p[0] <<" "<< p[1] <<" "<< p[2] <<" "<< p[3]<< std::endl;
 
@@ -174,10 +189,14 @@ void cprMover4HW::ResetJointsToZero(){
 	int id = 16;
 	int l = 4;
 	char data[8] = {1, 8, 125, 0, 0, 0, 0};		// CAN message to set the joint positions to zero
+
+	DisableMotors();							// otherwise the robot will make a jump afterwards (until the lag error stops him)
+
 	for(int i=0; i<nrOfJoints; i++){
 		itf.WriteMsg(jointIDs[i], l, data);
 		Wait(10);
 	}
+	keyboard.SetMessage("Joints set to zero");
 }
 
 //***********************************************************
@@ -189,6 +208,7 @@ void cprMover4HW::ResetError(){
 		itf.WriteMsg(jointIDs[i], l, data);
 		Wait(3);
 	}
+	keyboard.SetMessage("Error reset");
 }
 
 //********************************************
@@ -200,6 +220,19 @@ void cprMover4HW::EnableMotors(){
 		itf.WriteMsg(jointIDs[i], l, data);
 		Wait(3);
 	}
+	keyboard.SetMessage("Motors enabled");
+}
+
+//********************************************
+void cprMover4HW::DisableMotors(){
+	int id = 16;
+	int l = 4;
+	char data[8] = {1, 10, 0, 0, 0, 0, 0};		// CAN message to disable the motors
+	for(int i=0; i<nrOfJoints; i++){
+		itf.WriteMsg(jointIDs[i], l, data);
+		Wait(3);
+	}
+	keyboard.SetMessage("Motors disabled");
 }
 
 

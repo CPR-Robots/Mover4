@@ -33,30 +33,37 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
+#ifndef def_cpr_inputkeyboard
+#define def_cpr_inputkeyboard
 
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-
+#include <string>
 #include <boost/filesystem.hpp>
 #include <boost/thread.hpp>
 
 
-
+using namespace std;
 
 
 class cpr_InputKeyboard
 {
 public:
   	cpr_InputKeyboard();
-  	void GetMotionVec(double * v, bool reset, bool zero);
+  	void GetMotionVec(double * v);
   	void SetJoints(double * sj, double *cj);
-	
+  	void SetMessage(string msg);
+	void SetStatus(string msg);
+  	void UpdateMessages();
+
+  	string messages[5];
+  	int indexMsg;
 
   	double motionVec[6];
   	double currJoints[4];
   	double setPointJoints[4];
-  	char statusString[30];
+  	string statusString;
   	bool flagReset;
   	bool flagZero;
 
@@ -67,5 +74,6 @@ private:
 
 };
 
+#endif
 
 
