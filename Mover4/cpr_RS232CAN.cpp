@@ -132,7 +132,7 @@ bool cpr_RS232CAN::Connect(void )
 	const char *PORT = COMPORT;
 	serial_port_base::baud_rate baud_option(115200);
 	active = false;
-
+	string s;
 	try{
 		port = new serial_port(io);
 		port->open(PORT);
@@ -140,16 +140,20 @@ bool cpr_RS232CAN::Connect(void )
 
 		active = true;
 		//std::cerr << "Port " << PORT << " opened\n";
-		string s = "Port" + string(PORT) + "opened successfully";
-		keys->SetMessage(s);
+		s = "Port" + string(PORT) + "opened successfully";
+
 
 	}catch (boost::system::system_error &e){
 		boost::system::error_code ec = e.code();
-		std::cerr << "Cannot open port " << PORT << " - error code: " << ec.category().name() << std::endl;
+		s = "Could not open port " + string(PORT) + "! "; // + ec.category().name();
+		//std::cerr << "Cannot open port " << PORT << " - error code: " << ec.category().name() << std::endl;
 	}catch(std::exception e){
-		std::cerr << "Cannot open port " << PORT << " - error code: " << e.what() << endl;
+		//std::cerr << "Cannot open port " << PORT << " - error code: " << e.what() << endl;
+		s = "Could not open port " + string(PORT) + "! "; // + string(e.what());
+
 	}
 
+	keys->SetMessage(s);
 	boost::thread readThread(readLoop, (void*)this);
 
 	return true;
