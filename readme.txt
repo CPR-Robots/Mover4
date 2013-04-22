@@ -3,19 +3,16 @@ Mover4
 Test program to show how to interface with the Commonplace Robotics Mover4 robot arm
 
 
-Version 0.2	   
-August 13th, 2012    
+Version 0.3	  
+April 21st, 2013    
 info@cpr-robots.com
  
 
 
-Necessary hardware: USB2CAN adapter and Mover4 robot arm, both available via www.cpr-robots.com
+Necessary hardware: USB2CAN adapter (2013 version) and Mover4 robot arm, both available via www.cpr-robots.com
  
 The program has to be started in a terminal window.
- 
-
 Written and tested on Ubuntu 11.10, Eclipse 3.7.0 with CDT
- 
 Libraries: boost, ncurses
  
 
@@ -31,3 +28,7 @@ Also you can set the joints to zero.
 
 Attention: this software is a demo program only! For performing applications more attention on error handling and recovery should be paid!
  
+Changes:
+Version 0.3:
+	* Updated communication to the USB2CAN bridge with Checksum bits
+

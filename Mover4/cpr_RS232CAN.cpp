@@ -1,7 +1,7 @@
 /*********************************************************************
  * Software License Agreement (BSD License)
  *
- *  Copyright (c) 2012, Commonplace Robotics GmbH
+ *  Copyright (c) 2012-13, Commonplace Robotics GmbH
  *  http://www.commonplacerobotics.com
  *  All rights reserved.
  *
@@ -48,6 +48,7 @@
 #include "cpr_RS232CAN.h"
 
 using namespace::boost::asio;
+using namespace boost::posix_time;
 using namespace std;
 
 
@@ -59,11 +60,15 @@ using namespace std;
 //***************************************************************
 void readLoop(void * context )
 {
+	ptime start, now;
+	time_duration passed;
+
+
 	cpr_RS232CAN *ctx;
 	ctx = (cpr_RS232CAN*)context;
     //std::cout << "readLoop: running"  << std::endl;
-    char bu[10];
-    char buffer[10];
+    char bu[11];
+    char buffer[11];
     int bufferCnt = 0;
 
     int tmpid = 0;
@@ -72,31 +77,43 @@ void readLoop(void * context )
 
     	/*
     	 * Main Read loop: read one byte in a time
-    	 * When a known sender is found the complete CAN message of 10 bytes is read
-    	 * Still missing: resync when too much time has passed between the single bytes
+    	 * When a known sender is found the complete CAN message of 11 bytes is read
     	 */
 
-    	if(ctx->active)
-    			boost::asio::read(*(ctx->port), boost::asio::buffer(bu, 1));
+    	if(ctx->active){
+    		start = microsec_clock::universal_time();
+			boost::asio::read(*(ctx->port), boost::asio::buffer(bu, 1));
+			now = microsec_clock::universal_time();
+			passed = now - start;
 
 
-    	if(bufferCnt == 0){
-    		tmpid = (int)bu[0];
-    		if(tmpid == 17 || tmpid == 33 || tmpid == 49 || tmpid == 65){
-    			buffer[0] = bu[0];
-    			bufferCnt++;
-    		}
-    	}else{
-    		buffer[bufferCnt] = bu[0];
-    		bufferCnt++;
+			if(passed.total_milliseconds() > 2){		// we are out of sync!!!
+				bufferCnt = 0;
+			}
 
-    		if(bufferCnt == 10){
-    			ctx->EvaluateBuffer(buffer);
-    			bufferCnt = 0;
-    		}
+
+			if(bufferCnt == 0){
+				tmpid = (int)bu[0];
+				if(tmpid == 17 || tmpid == 33 || tmpid == 49 || tmpid == 65 || tmpid == 81){
+					buffer[0] = bu[0];
+					bufferCnt++;
+				}
+			}else{
+				buffer[bufferCnt] = bu[0];
+				bufferCnt++;
+
+				if(bufferCnt == 11){
+					ctx->EvaluateBuffer(buffer);
+					bufferCnt = 0;
+				}
+
+
+			}
 
 
     	}
+
+
 
 /*
     		std::cout << "read: " << (int)buffer[0];
@@ -117,7 +134,6 @@ void readLoop(void * context )
     std::cout << "readLoop: finished" << std::endl;
 }
 
-
 //***************************************************************
 cpr_RS232CAN::cpr_RS232CAN()
 {
@@ -130,7 +146,7 @@ bool cpr_RS232CAN::Connect(void )
 {
 	io_service io;
 	const char *PORT = COMPORT;
-	serial_port_base::baud_rate baud_option(115200);
+	serial_port_base::baud_rate baud_option(460800);
 	active = false;
 	string s;
 	try{
@@ -173,7 +189,7 @@ bool cpr_RS232CAN::Disconnect()
 //***************************************************************
 /*
  * Checks for validity of the messages and stores them in a buffer for later access
- * Validity check here is poor; For performing applications further checks should be incorporated.
+ * Validity check here is based on checsum bit; 
  */
 int cpr_RS232CAN::EvaluateBuffer(char* buf){
 
@@ -181,14 +197,20 @@ int cpr_RS232CAN::EvaluateBuffer(char* buf){
 	int mid = (int)buf[0];
 	int length = (int)buf[1];
 
-	if(length <= 8){
-		msgBuffer[mid].length = length;
+	int sum = 0;				// genereate a simple checksum bit from the
+	for(i=0; i<10; i++)			// received data
+		sum += buf[i];
+	sum = sum % 256;
+
+	
+	if(sum == buf[10]){			// compare it with the remote generated
+		msgBuffer[mid].length = length; // checksum bit
 		msgBuffer[mid].id = mid;
 		for(i=0; i<8; i++)
 			msgBuffer[mid].data[i] = buf[i+2];
 		//std::cout << "found good msg\n";
 	}else{
-		//std::cerr << "found bad msg\n";
+		//std::cerr << "found bad msg \n"
 		//keys->SetMessage("found bad message");
 	}
 
@@ -199,18 +221,27 @@ int cpr_RS232CAN::EvaluateBuffer(char* buf){
 //***************************************************************
 void cpr_RS232CAN::WriteMsg(int id, int length, char* data)
 {
-	unsigned char commands[10] = {16, 4, 4, 125, 125, 0,0,0,0,0};
+	unsigned char commands[11] = {16, 4, 4, 125, 125, 0,0,0,0,0, 19};
+	int sum = 0;
 
 	commands[0] = id;
 	commands[1] = length;
 	for(int i=0; i<8; i++)
 		commands[2+i] = data[i];
 
-	if(active)
-		boost::asio::write(*port, boost::asio::buffer(commands, 10));
+	for(int i=0; i<10; i++)			// compute the check byte
+		sum += commands[i];
+	sum = sum % 256;
+	commands[10] = sum;	
 
+	if(active)
+		boost::asio::write(*port, boost::asio::buffer(commands, 11));
+
+	//std::cerr << "write: "<<id<<"\n";
 	return;
 }
+
+
 
 
 //***************************************************************
