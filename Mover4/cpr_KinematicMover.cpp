@@ -74,7 +74,7 @@ void cpr_KinematicMover::SetMotionVec(double *vec){
 int cpr_KinematicMover::moveJoint(){
 
 	for(int i=0; i<4; i++){
-		setPointState.j[i] += 0.1 * motionVec[i];
+		setPointState.j[i] += 0.2 * motionVec[i];
 	}
 	return 0;
 }

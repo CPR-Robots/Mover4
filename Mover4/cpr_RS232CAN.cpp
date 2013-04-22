@@ -94,10 +94,10 @@ void readLoop(void * context )
 
 			if(bufferCnt == 0){
 				tmpid = (int)bu[0];
-				if(tmpid == 17 || tmpid == 33 || tmpid == 49 || tmpid == 65 || tmpid == 81){
+			//	if(tmpid == 17 || tmpid == 33 || tmpid == 49 || tmpid == 65 || tmpid == 81){
 					buffer[0] = bu[0];
 					bufferCnt++;
-				}
+			//	}
 			}else{
 				buffer[bufferCnt] = bu[0];
 				bufferCnt++;

@@ -35,7 +35,7 @@
 
 /*
  * Mover4
- * Version 0.3	   April 21st, 2012    info@cpr-robots.com
+ * Version 0.3	   April 21st, 2013    info@cpr-robots.com
  *
  * Test program to show how to interface with the Commonplace Robotics Mover4 robot arm
  * Necessary hardware: USB2CAN adapter and Mover4 robot arm, both available via www.cpr-robots.com
@@ -127,8 +127,8 @@ cprMover4HW::cprMover4HW()
 void cprMover4HW::DoComm(){
 
 	int id = 16;
-	int l = 4;
-	char data[8] = {4, 125, 99, 0};
+	int l = 5;				// length for position commands: 5 byte. for velocity commands 4 bytes
+	char data[8] = {4, 125, 99, 0, 45};	// cmd, vel, posH, posL, counter
 
 
 	double v[6];
@@ -149,13 +149,13 @@ void cprMover4HW::DoComm(){
 		ResetJointsToZero();
 	}
 
-	int tics = 32000;	// Write CAN messages with the desired encoder tics
+	int tics = 32000;		// Write CAN messages with the desired encoder tics
 	for(int i=0; i<nrOfJoints; i++){
 		tics = kin.computeTics(kin.setPointState.j[i]);
 		data[2] = tics / 256;
 		data[3] = tics % 256;
-		itf.WriteMsg(jointIDs[i], l, data);
-		Wait(10);
+		itf.WriteMsg(jointIDs[i], l, data);		// the CAN messages must have the correct length, otherwise they will be ignored
+		Wait(3);
 
 	}
 
@@ -192,7 +192,7 @@ void cprMover4HW::ResetJointsToZero(){
 
 	for(int i=0; i<nrOfJoints; i++){
 		itf.WriteMsg(jointIDs[i], l, data);
-		Wait(6);
+		Wait(3);
 	}
 	keyboard.SetMessage("Joints set to zero");
 }
@@ -275,7 +275,7 @@ int main( int argc, char** argv )
 		passed = now - start;
 
 
-		while( passed.total_milliseconds() < 100){	// set the cycle time here
+		while( passed.total_milliseconds() < 50){	// set the cycle time here
 			now = microsec_clock::universal_time();
 			passed = now - start;
 
