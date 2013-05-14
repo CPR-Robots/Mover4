@@ -44,6 +44,7 @@
 #include <boost/system/system_error.hpp>
 #include <boost/thread.hpp>
 #include <boost/date_time.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include "cpr_RS232CAN.h"
 
@@ -92,12 +93,12 @@ void readLoop(void * context )
 			}
 
 
-			if(bufferCnt == 0){
+			if(bufferCnt == 0 ){
+				
 				tmpid = (int)bu[0];
-			//	if(tmpid == 17 || tmpid == 33 || tmpid == 49 || tmpid == 65 || tmpid == 81){
-					buffer[0] = bu[0];
-					bufferCnt++;
-			//	}
+				buffer[0] = bu[0];
+				bufferCnt++;
+				
 			}else{
 				buffer[bufferCnt] = bu[0];
 				bufferCnt++;
@@ -115,20 +116,6 @@ void readLoop(void * context )
 
 
 
-/*
-    		std::cout << "read: " << (int)buffer[0];
-    		std::cout << " " << (int)buffer[1];
-    		std::cout << " " << (int)buffer[2];
-    		std::cout << " " << (int)buffer[3];
-    		std::cout << " " << (int)buffer[4];
-    		std::cout << " " << (int)buffer[5];
-    		std::cout << " " << (int)buffer[6];
-    		std::cout << " " << (int)buffer[7];
-    		std::cout << " " << (int)buffer[8];
-    		std::cout << " " << (int)buffer[9] << std::endl;
-*/
-
-
     }
 
     std::cout << "readLoop: finished" << std::endl;
@@ -137,6 +124,13 @@ void readLoop(void * context )
 //***************************************************************
 cpr_RS232CAN::cpr_RS232CAN()
 {
+	// init the message buffer
+	for(int i=0; i< 256; i++){
+		msgBuffer[i].length = 0;
+		msgBuffer[i].id = i;
+		for(int j=0; j<8; j++)
+			msgBuffer[i].data[j] = 0x80;
+	}
 
 }
 
@@ -190,20 +184,22 @@ bool cpr_RS232CAN::Disconnect()
 /*
  * Checks for validity of the messages and stores them in a buffer for later access
  * Validity check here is based on checsum bit; 
+ * !!! Check out for conversion types, thes checksum has to be added from unsigned chars!!!
  */
 int cpr_RS232CAN::EvaluateBuffer(char* buf){
 
 	int i = 0;
 	int mid = (int)buf[0];
 	int length = (int)buf[1];
+	int cs = (unsigned char)buf[10];	// checksum byte
 
 	int sum = 0;				// genereate a simple checksum bit from the
 	for(i=0; i<10; i++)			// received data
-		sum += buf[i];
+		sum += (unsigned char)buf[i];
 	sum = sum % 256;
 
 	
-	if(sum == buf[10]){			// compare it with the remote generated
+	if(sum == cs){			// compare it with the remote generated
 		msgBuffer[mid].length = length; // checksum bit
 		msgBuffer[mid].id = mid;
 		for(i=0; i<8; i++)
@@ -211,7 +207,20 @@ int cpr_RS232CAN::EvaluateBuffer(char* buf){
 		//std::cout << "found good msg\n";
 	}else{
 		//std::cerr << "found bad msg \n"
-		//keys->SetMessage("found bad message");
+		string s = "found bad message: ";
+		string s2 = ""; 
+		for(int i=0; i<10; i++){
+			s2 = boost::lexical_cast<string>( (unsigned char)buf[i] );
+			s.append(s2);
+			s.append(" ");	
+		}
+		string sCheck = boost::lexical_cast<string>( cs );
+		s.append(sCheck);
+		s.append(" ");	
+		sCheck = boost::lexical_cast<string>( sum );
+		s.append(sCheck);
+			
+		keys->SetMessage(s);
 	}
 
 	return 0;
@@ -262,6 +271,8 @@ int cpr_RS232CAN::GetMsg(int id, int *length, char* data)
 
 	
 }
+
+
 
 
 

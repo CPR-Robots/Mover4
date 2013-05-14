@@ -65,6 +65,7 @@ public:
   	double setPointJoints[4];
   	string statusString;
   	bool flagReset;
+  	bool flagEnable;
   	bool flagZero;
 
 private:

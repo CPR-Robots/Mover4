@@ -35,7 +35,7 @@
 
 /*
  * Mover4
- * Version 0.3	   April 21st, 2013    info@cpr-robots.com
+ * Version 0.4	   May 14th, 2013    info@cpr-robots.com
  *
  * Test program to show how to interface with the Commonplace Robotics Mover4 robot arm
  * Necessary hardware: USB2CAN adapter and Mover4 robot arm, both available via www.cpr-robots.com
@@ -45,11 +45,18 @@
  *
  * Functionalities: The program establishes a connection to the robot via a virtual com port of the USB2CAN driver
  * This com port has to be set in cpr_RS232CAN.cpp, preset is /dev/ttyUSB0.
- * Then the communication to the robot is established, Joints are resettet and motors enabled
+ * Then the communication to the robot is established, Joint positions are read and motors enabled
  * With the keyboard you can move the single joints now
  * Also you can set the joints to zero.
  *
- * ToDo: thread safety is completely missing up till now
+ * Usage:
+ * 1. Start with ./Mover4
+ * 2. Reset Errors and load current joint values with 'p'
+ * 3. Enable Motors with 'o'
+ * 4. Move Robot with 'q' to 'f'
+ * 5. If necessary set joints to zero with 'z', afterwards again reset and enable the motors
+ *
+ * ToDo: This program is only a comm demo, not a usable robot interface. E.g. thread safety is completely missing up till now.
  */
 
 
@@ -98,6 +105,8 @@ private:
 	int jointIDs[4];
 	int nrOfJoints;
 
+	bool flagDoComm;
+
 	int InvKin(void);
 	bool flagRequestReset;
 	bool flagRequestZero;
@@ -117,6 +126,8 @@ cprMover4HW::cprMover4HW()
 	jointIDs[1] = 32;
 	jointIDs[2] = 48;
 	jointIDs[3] = 64;
+
+	flagDoComm = true;
 
 	itf.keys = &keyboard;
 	itf.Connect();	
@@ -141,6 +152,10 @@ void cprMover4HW::DoComm(){
 	if(keyboard.flagReset){
 		keyboard.flagReset = false;
 		ResetError();
+	}
+
+	if(keyboard.flagEnable){
+		keyboard.flagEnable = false;
 		EnableMotors();
 	}
 
@@ -149,15 +164,20 @@ void cprMover4HW::DoComm(){
 		ResetJointsToZero();
 	}
 
-	int tics = 32000;		// Write CAN messages with the desired encoder tics
-	for(int i=0; i<nrOfJoints; i++){
-		tics = kin.computeTics(kin.setPointState.j[i]);
-		data[2] = tics / 256;
-		data[3] = tics % 256;
-		itf.WriteMsg(jointIDs[i], l, data);		// the CAN messages must have the correct length, otherwise they will be ignored
-		Wait(3);
 
+	int tics = 32000;	// Write CAN messages with the desired encoder tics
+	if(flagDoComm){
+		for(int i=0; i<nrOfJoints; i++){
+
+			tics = kin.computeTics(kin.setPointState.j[i]);
+			data[2] = tics / 256;	// Joint Position High Byte
+			data[3] = tics % 256;	// Joint Position Low Byte
+			itf.WriteMsg(jointIDs[i], l, data);
+			Wait(5);
+
+		}
 	}
+
 
 	double p[4];
 	for(int i=0; i<nrOfJoints; i++){	// and read the current joint positions
@@ -188,25 +208,45 @@ void cprMover4HW::ResetJointsToZero(){
 	int l = 4;
 	char data[8] = {1, 8, 125, 0, 0, 0, 0};	// CAN message to set the joint positions to zero
 
+	flagDoComm = false;
+
 	DisableMotors();			// otherwise the robot will make a jump afterwards (until the lag error stops him)
 
 	for(int i=0; i<nrOfJoints; i++){
 		itf.WriteMsg(jointIDs[i], l, data);
-		Wait(3);
+		Wait(6);
 	}
 	keyboard.SetMessage("Joints set to zero");
+
+	flagDoComm = true;
 }
 
+
 //***********************************************************
+// This function does two things: 
+// 1. Copy the current position into the setPoint position
+// 2. Send the robot the resetError messages
 void cprMover4HW::ResetError(){
 	int id = 16;
 	int l = 2;
 	char data[8] = {1, 6, 0, 0, 0, 0, 0};		// CAN message to reset the errors
+
+	flagDoComm = false;
+
+	// copy current to setPoint
+	for(int i=0; i<4; i++)
+		kin.setPointState.j[i] = kin.currState.j[i];	// joint angles
+	for(int i=0; i<6; i++)
+		kin.setPointState.p[i] = kin.currState.p[i];	// cartesian position
+	
+	// then reset the errors
 	for(int i=0; i<nrOfJoints; i++){
 		itf.WriteMsg(jointIDs[i], l, data);
 		Wait(3);
 	}
 	keyboard.SetMessage("Error reset");
+
+	flagDoComm = true;
 }
 
 //********************************************
@@ -214,11 +254,13 @@ void cprMover4HW::EnableMotors(){
 	int id = 16;
 	int l = 2;
 	char data[8] = {1, 9, 0, 0, 0, 0, 0};		// CAN message to enable the motors
+	flagDoComm = false;
 	for(int i=0; i<nrOfJoints; i++){
 		itf.WriteMsg(jointIDs[i], l, data);
 		Wait(3);
 	}
 	keyboard.SetMessage("Motors enabled");
+	flagDoComm = true;
 }
 
 //********************************************
@@ -226,11 +268,13 @@ void cprMover4HW::DisableMotors(){
 	int id = 16;
 	int l = 2;
 	char data[8] = {1, 10, 0, 0, 0, 0, 0};		// CAN message to disable the motors
+	flagDoComm = false;
 	for(int i=0; i<nrOfJoints; i++){
 		itf.WriteMsg(jointIDs[i], l, data);
 		Wait(3);
 	}
 	keyboard.SetMessage("Motors disabled");
+	flagDoComm = true;
 }
 
 
@@ -264,9 +308,7 @@ int main( int argc, char** argv )
 
 	cprMover4HW myMover;	
   	
-	//myMover.ResetError();		// now has to be done manually
-	//myMover.EnableMotors();
-
+	
 	while (true)			// this is the main loop
 	{				// but all interesting things are done in DoComm()
 		start = microsec_clock::universal_time();
@@ -275,7 +317,7 @@ int main( int argc, char** argv )
 		passed = now - start;
 
 
-		while( passed.total_milliseconds() < 50){	// set the cycle time here
+		while( passed.total_milliseconds() < 100){	// set the cycle time here
 			now = microsec_clock::universal_time();
 			passed = now - start;
 

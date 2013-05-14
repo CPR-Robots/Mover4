@@ -67,6 +67,7 @@ void keyLoop(void * context )
 
     while (true)
     {
+	erase();
 
     	// Output on the terminal screen
     	mvprintw(2,0, "  Mover4 test program");
@@ -85,8 +86,9 @@ void keyLoop(void * context )
     	mvprintw(10,38, "%.1lf", ctx->currJoints[3]);
 
 
-    	mvprintw(14, 2, "Reset errors and enable: p - Set joint positions to zero: z");
+    	mvprintw(14, 2, "Reset errors: p - Enable Motors: o - Set joint positions to zero: z");
 
+	ctx->UpdateMessages();
 
 
 
@@ -102,6 +104,7 @@ void keyLoop(void * context )
 			case 'r': ctx->motionVec[3] =  1.0; break;
 			case 'f': ctx->motionVec[3] = -1.0; break;
 			case 'p': ctx->flagReset = true; break;
+			case 'o': ctx->flagEnable = true; break;
 			case 'z': ctx->flagZero = true; break;
     	}
 
@@ -188,6 +191,11 @@ void cpr_InputKeyboard::SetMessage(string msg){
 //***************************************************************
 cpr_InputKeyboard::cpr_InputKeyboard()
 {
+
+	flagEnable = false;	// initialize the flags
+	flagReset = false;
+	flagZero = false;
+
 	(void) initscr();      // init the curses library
 	keypad(stdscr, TRUE);  // enable keyboard mapping
 	(void) nonl();         // tell curses not to do NL->CR/NL on output
@@ -195,7 +203,7 @@ cpr_InputKeyboard::cpr_InputKeyboard()
 	(void) noecho();        // do not echo input
 
 
-	boost::thread keyThread(keyLoop, (void*)this);
+	boost::thread keyThread(keyLoop, (void*)this);		// main loop to read/write the keyboard/screen
 
 	for (int i=0; i<6; i++ )
 		motionVec[i] = 0.0;
