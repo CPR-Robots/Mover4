@@ -230,6 +230,7 @@ int cpr_RS232CAN::EvaluateBuffer(char* buf){
 //***************************************************************
 void cpr_RS232CAN::WriteMsg(int id, int length, char* data)
 {
+
 	unsigned char commands[11] = {16, 4, 4, 125, 125, 0,0,0,0,0, 19};
 	int sum = 0;
 
@@ -257,6 +258,7 @@ void cpr_RS232CAN::WriteMsg(int id, int length, char* data)
 // Forwards a received message from the buffer
 int cpr_RS232CAN::GetMsg(int id, int *length, char* data)
 {
+
 
 	if(id>255)
 		throw std::string("invalid message id!");

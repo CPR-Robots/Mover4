@@ -53,6 +53,7 @@ public:
   	cpr_InputKeyboard();
   	void GetMotionVec(double * v);
   	void SetJoints(double * sj, double *cj);
+	void SetPosition(double *sp, double *cp);
   	void SetMessage(string msg);
 	void SetStatus(string msg);
   	void UpdateMessages();
@@ -63,10 +64,13 @@ public:
   	double motionVec[6];
   	double currJoints[4];
   	double setPointJoints[4];
+	double currPosition[4];
+	double setPointPosition[4];
   	string statusString;
   	bool flagReset;
   	bool flagEnable;
   	bool flagZero;
+	int motionType;		// 0=Joint, 1=Cartesian
 
 private:
   

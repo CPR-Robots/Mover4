@@ -33,6 +33,8 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
+// Last change: May 16th, 2013
+
 
 #include <math.h>
 #include <stdio.h>
@@ -41,17 +43,22 @@
 #include <iostream>
 #include <stdexcept>
 
+#include "cpr_Matrix4.h"
+
 using namespace std;
 
 
+// the struct stores information about the current robots state:
+// joint positions, cartesian position and error code
 struct robotState
 {
-	double p[6];
-	double j[4];
+	double p[6];		// cart position
+	double j[4];		// joint position
 	int errorCode[4];
 };
 
 
+// Provides the necessary kinematic information and functionalities to enable cartesian motion
 class cpr_KinematicMover
 {
 public:
@@ -59,32 +66,38 @@ public:
 	
   	void SetMotionVec(double *vec);
   	int moveJoint();
-  	int moveCart(double *vel);
+  	int moveCart();
   	int forwardKin(robotState s);
-  	int inverseKin(robotState s);
+	int inverseKin(robotState s);
 
-  	double computeJointPos(int);
-  	int computeTics(double);
+  	double computeJointPos(int, int);
+  	int computeTics(int, double);
 
   	robotState setPointState;
   	robotState currState;
+	cpr_Matrix4 lastPosition;
 
 private:
 
-  	double x1;
   	double v[4];
 
   	double motionVec[6];
+	double gearScale[4];
+	
 
   	const static double deg2rad = 3.14159 / 180.0;
-    const static double rad2deg = 180.0 / 3.14159;
+    	const static double rad2deg = 180.0 / 3.14159;
 
+	// kinematic length of the Mover4 robot arm in mm
+    	const static double lz0 = 130.0;	// base
+    	const static double lz1 = 62.5;		// first joint
+    	const static double lz2 = 190.0;	// upper arm
+    	const static double lz3 = 220.0;	// lower arm
+	const static double lz4 = 48.0;		// hand
 
-    const static double lz0 = 150.0;		// foot
-    const static double lz1 = 250.0;		// upper arm
-    const static double lz2 = 300.0;		// lower arm
-    const static double lz3 = 50.0;		// hand
+	const static double EpsilonCenter = 5.0;		// forbidden radius around the z axis in mm 
 
+	bool flagSymmetryEllbowUp;				// for one cartesian position there are typically two joint positions. This flag stores which one to use
 
 
 };

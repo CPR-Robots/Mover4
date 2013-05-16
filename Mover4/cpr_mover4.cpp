@@ -35,28 +35,28 @@
 
 /*
  * Mover4
- * Version 0.4	   May 14th, 2013    info@cpr-robots.com
+ * Version 0.5	   May 16th, 2013    info@cpr-robots.com
  *
  * Test program to show how to interface with the Commonplace Robotics Mover4 robot arm
  * Necessary hardware: USB2CAN adapter and Mover4 robot arm, both available via www.cpr-robots.com
  * The program has to be started in a terminal window.
- * Written and tested on Ubuntu 11.10, Eclipse 3.7.0 with CDT
+ * Written and tested on Ubuntu 11.10, gcc
  * Libraries: boost, ncurses
  *
- * Functionalities: The program establishes a connection to the robot via a virtual com port of the USB2CAN driver
- * This com port has to be set in cpr_RS232CAN.cpp, preset is /dev/ttyUSB0.
- * Then the communication to the robot is established, Joint positions are read and motors enabled
- * With the keyboard you can move the single joints now
- * Also you can set the joints to zero.
+ * Functionalities: 
+ * 	- establish a connection to the robot via a virtual com port of the USB2CAN driver. (to be set in cpr_RS232CAN.cpp, preset is /dev/ttyUSB0)
+ * 	- establish a communication loop, Joint positions are read and set, motors can be reset, enabled and zeroed
+ * 	- move the single joints or cartesian directions with the keyboard
  *
  * Usage:
  * 1. Start with ./Mover4
- * 2. Reset Errors and load current joint values with 'p'
+ * 2. Reset Errors and load current joint values with 'p' (maybe press space to update the screen)
  * 3. Enable Motors with 'o'
- * 4. Move Robot with 'q' to 'f'
- * 5. If necessary set joints to zero with 'z', afterwards again reset and enable the motors
+ * 4. Move Robot with 'q' to 'f' in joint mode
+ * 5. Or move the robot with 'z' to 'k' in cartesian mode. XYZ can be set, B stay in at the current value.
+ * 6. If necessary set joints to zero with 'z', afterwards again reset and enable the motors
  *
- * ToDo: This program is only a comm demo, not a usable robot interface. E.g. thread safety is completely missing up till now.
+ * ToDo: This program is only a communication demo, not a usable robot interface. E.g. thread safety is completely missing up till now.
  */
 
 
@@ -100,16 +100,14 @@ private:
 	cpr_RS232CAN itf;		// provides the hardware interface to the robots CAN bus via a virtual com port
 	cpr_InputKeyboard keyboard;	// reads keys to move the joints; a minimal interface
 
-	// robot state
 	robotState state;
-	int jointIDs[4];
+	int jointIDs[4];		// CAN IDs of the robots joints
 	int nrOfJoints;
 
-	bool flagDoComm;
+	bool flagDoComm;		// flag to interrupt the standard comm loop, e.g. to set joints to zero
 
-	int InvKin(void);
-	bool flagRequestReset;
-	bool flagRequestZero;
+	int InvKin(void);		// the kinematics module
+	
   
 
 };
@@ -135,67 +133,74 @@ cprMover4HW::cprMover4HW()
 
 
 //********************************************
+// Main communication loop. 
+// Reads the keyboard, generates new joint values with the help of the kinematic module and then writes on the CAN bus.
 void cprMover4HW::DoComm(){
 
-	int id = 16;
+	// storage necessary for the CAN communication
+	int id = 16;				
 	int l = 5;				// length for position commands: 5 byte. for velocity commands 4 bytes
 	char data[8] = {4, 125, 99, 0, 45};	// cmd, vel, posH, posL, counter
 
 
 	double v[6];
-	keyboard.GetMotionVec(v);					// Get the user input
-	kin.SetMotionVec(v);						// forward user input to the kinematic
-	kin.moveJoint();						// compute next set point position (could also be cartesian)
+	keyboard.GetMotionVec(v);			// Get the user input, joint or cartesian velocites
+	kin.SetMotionVec(v);				// forward user input to the kinematic
+	
+	if(keyboard.motionType == 0)			// did the user want to move in joint or cart mode?
+		kin.moveJoint();			// compute next set point position in Joint mode
+	else
+		kin.moveCart();				// compute next set point position in Cartesian mode
+	
 	keyboard.SetJoints(kin.setPointState.j, kin.currState.j);	// and hand back for visualization
+	keyboard.SetPosition(kin.setPointState.p, kin.currState.p);	
 
 
-	if(keyboard.flagReset){
+	if(keyboard.flagReset){				// do a motor reset if requested
 		keyboard.flagReset = false;
 		ResetError();
 	}
 
-	if(keyboard.flagEnable){
+	if(keyboard.flagEnable){			// enable the motors if requested
 		keyboard.flagEnable = false;
 		EnableMotors();
 	}
-
-	if(keyboard.flagZero){
+	
+	if(keyboard.flagZero){				// set the joints to zero if requested (zeroes the EEPROM in the robots joint controllers)
 		keyboard.flagZero = false;
 		ResetJointsToZero();
 	}
 
 
-	int tics = 32000;	// Write CAN messages with the desired encoder tics
+	// Write the desired set point position to the joints
+	int tics = 32000;	// send the desired encoder tics from 0 to 64000, 32000 is zero
 	if(flagDoComm){
-		for(int i=0; i<nrOfJoints; i++){
+		for(int i=0; i<nrOfJoints; i++){				// go through all four joints
 
-			tics = kin.computeTics(kin.setPointState.j[i]);
-			data[2] = tics / 256;	// Joint Position High Byte
-			data[3] = tics % 256;	// Joint Position Low Byte
-			itf.WriteMsg(jointIDs[i], l, data);
-			Wait(5);
-
+			tics = kin.computeTics(i, kin.setPointState.j[i]);	// get the tics out of the joint position in degree
+			data[2] = tics / 256;					// Joint Position High Byte
+			data[3] = tics % 256;					// Joint Position Low Byte
+			itf.WriteMsg(jointIDs[i], l, data);			// write the message to the joint controller
+			Wait(5);						// wait a short time to avoid a crowded bus
 		}
 	}
 
 
+	// read the answers of the robot joint controllers
 	double p[4];
-	for(int i=0; i<nrOfJoints; i++){	// and read the current joint positions
-		itf.GetMsg(jointIDs[i]+1, &l, data);
-		tics = (256 * ((int)((unsigned char)data[2]))) + ((unsigned int)((unsigned char)data[3]));
-		kin.currState.j[i] = kin.computeJointPos(tics);
-		kin.currState.errorCode[i] = (int)data[0];
+	for(int i=0; i<nrOfJoints; i++){					// jor all four joints
+		itf.GetMsg(jointIDs[i]+1, &l, data);				// get the last message that has been received
+		tics = (256 * ((int)((unsigned char)data[2]))) + ((unsigned int)((unsigned char)data[3]));	// combine the two bytes to the position in encoder tics	
+		kin.currState.j[i] = kin.computeJointPos(i, tics);		// compute the Joint position in degree
+		kin.currState.errorCode[i] = (int)data[0];			// store the joints error code (see protocol description)
 	}
 
 
-	string s = boost::lexical_cast<string>( kin.currState.errorCode[0] );
+	string s = boost::lexical_cast<string>( kin.currState.errorCode[0] );	// generate a string from the four error codes
 	s += " " + boost::lexical_cast<string>( kin.currState.errorCode[1] );
 	s += " " + boost::lexical_cast<string>( kin.currState.errorCode[2] );
 	s += " " + boost::lexical_cast<string>( kin.currState.errorCode[3] );
 	keyboard.SetStatus(s);
-
-
-	//std::cout << "joints: "<< p[0] <<" "<< p[1] <<" "<< p[2] <<" "<< p[3]<< std::endl;
 
 	return;
 }
@@ -203,6 +208,7 @@ void cprMover4HW::DoComm(){
 
 
 //********************************************
+// Resets the position EEPROM on the four joint controller
 void cprMover4HW::ResetJointsToZero(){
 	int id = 16;
 	int l = 4;
@@ -250,6 +256,7 @@ void cprMover4HW::ResetError(){
 }
 
 //********************************************
+// enable the motors, necessary to move them
 void cprMover4HW::EnableMotors(){
 	int id = 16;
 	int l = 2;
@@ -317,7 +324,7 @@ int main( int argc, char** argv )
 		passed = now - start;
 
 
-		while( passed.total_milliseconds() < 100){	// set the cycle time here
+		while( passed.total_milliseconds() < 50){	// set the cycle time here
 			now = microsec_clock::universal_time();
 			passed = now - start;
 

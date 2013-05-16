@@ -33,6 +33,8 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
+// Last change: May 16th, 2013
+
 
 #include <math.h>
 #include <stdio.h>
@@ -72,21 +74,32 @@ void keyLoop(void * context )
     	// Output on the terminal screen
     	mvprintw(2,0, "  Mover4 test program");
     	mvprintw(3,0, "  Use the following keys to jog the joints");
-    	mvprintw(5,0, "    q           w           e           r");
-    	mvprintw(6,0, "  Joint 1     Joint 2     Joint 3     Joint 4");
-    	mvprintw(7,0, "    a           s           d           f");
+    	mvprintw(5,0, "    q         w        e       r          z       u       i         ");
+    	mvprintw(6,0, "  Joint1   Joint2   Joint3   Joint4     CartX   CartY   CartZ   RotB");
+    	mvprintw(7,0, "    a         s        d       f          h       j       k         ");
     	mvprintw(9,2,  "%.1lf", ctx->setPointJoints[0]);
-    	mvprintw(9,14,  "%.1lf", ctx->setPointJoints[1]);
-    	mvprintw(9,26,  "%.1lf", ctx->setPointJoints[2]);
-    	mvprintw(9,38,  "%.1lf", ctx->setPointJoints[3]);
+    	mvprintw(9,12,  "%.1lf", ctx->setPointJoints[1]);
+    	mvprintw(9,22,  "%.1lf", ctx->setPointJoints[2]);
+    	mvprintw(9,31,  "%.1lf", ctx->setPointJoints[3]);
 
-    	mvprintw(10,2, "%.1lf", ctx->currJoints[0]);
-    	mvprintw(10,14, "%.1lf", ctx->currJoints[1]);
-    	mvprintw(10,26, "%.1lf", ctx->currJoints[2]);
-    	mvprintw(10,38, "%.1lf", ctx->currJoints[3]);
+    	mvprintw(9,42,  "%.1lf", ctx->setPointPosition[0]);
+    	mvprintw(9,50,  "%.1lf", ctx->setPointPosition[1]);
+    	mvprintw(9,58,  "%.1lf", ctx->setPointPosition[2]);
+    	mvprintw(9,66,  "%.1lf", ctx->setPointPosition[3]);
 
 
-    	mvprintw(14, 2, "Reset errors: p - Enable Motors: o - Set joint positions to zero: z");
+      	mvprintw(10,2, "%.1lf", ctx->currJoints[0]);
+    	mvprintw(10,12, "%.1lf", ctx->currJoints[1]);
+    	mvprintw(10,22, "%.1lf", ctx->currJoints[2]);
+    	mvprintw(10,31, "%.1lf", ctx->currJoints[3]);
+
+	mvprintw(10,42,  "%.1lf", ctx->currPosition[0]);
+    	mvprintw(10,50,  "%.1lf", ctx->currPosition[1]);
+    	mvprintw(10,58,  "%.1lf", ctx->currPosition[2]);
+    	mvprintw(10,66,  "%.1lf", ctx->currPosition[3]);
+
+
+    	mvprintw(14, 2, "Reset errors: p - Enable Motors: o - Set joint positions to zero: x");
 
 	ctx->UpdateMessages();
 
@@ -94,18 +107,31 @@ void keyLoop(void * context )
 
     	c = getch();
 
+	double vel = 1.0;
+
     	switch(c){
-			case 'q': ctx->motionVec[0] =  1.0; break;
-			case 'a': ctx->motionVec[0] = -1.0; break;
-			case 'w': ctx->motionVec[1] =  1.0; break;
-			case 's': ctx->motionVec[1] = -1.0; break;
-			case 'e': ctx->motionVec[2] =  1.0; break;
-			case 'd': ctx->motionVec[2] = -1.0; break;
-			case 'r': ctx->motionVec[3] =  1.0; break;
-			case 'f': ctx->motionVec[3] = -1.0; break;
+			// joint keys
+			case 'q': ctx->motionType = 0; ctx->motionVec[0] = vel; break;
+			case 'a': ctx->motionType = 0; ctx->motionVec[0] = -vel; break;
+			case 'w': ctx->motionType = 0; ctx->motionVec[1] = vel; break;
+			case 's': ctx->motionType = 0; ctx->motionVec[1] = -vel; break;
+			case 'e': ctx->motionType = 0; ctx->motionVec[2] = vel; break;
+			case 'd': ctx->motionType = 0; ctx->motionVec[2] = -vel; break;
+			case 'r': ctx->motionType = 0; ctx->motionVec[3] = vel; break;
+			case 'f': ctx->motionType = 0; ctx->motionVec[3] = -vel; break;
+			
+			// cartesian keys
+			case 'z': ctx->motionType = 1; ctx->motionVec[0] = vel; break;
+			case 'h': ctx->motionType = 1; ctx->motionVec[0] = -vel; break;
+			case 'u': ctx->motionType = 1; ctx->motionVec[1] = vel; break;
+			case 'j': ctx->motionType = 1; ctx->motionVec[1] = -vel; break;
+			case 'i': ctx->motionType = 1; ctx->motionVec[2] = vel; break;
+			case 'k': ctx->motionType = 1; ctx->motionVec[2] = -vel; break;
+
+			// reset, enable and zero
 			case 'p': ctx->flagReset = true; break;
 			case 'o': ctx->flagEnable = true; break;
-			case 'z': ctx->flagZero = true; break;
+			case 'x': ctx->flagZero = true; break;
     	}
 
     	refresh();			/* Print it on to the real screen */
@@ -117,16 +143,17 @@ void keyLoop(void * context )
 
 
 //***************************************************************
+// Provides the motion vector the user has generated with the keys
 void cpr_InputKeyboard::GetMotionVec(double * v){
 
 	for(int i=0; i<6; i++){
-		v[i] = motionVec[i];
+		v[i] = motionVec[i];			// copy the current values generated in the readLoop
 
-		if(fabs(motionVec[i]) > 0.1){
+		if(fabs(motionVec[i]) > 0.1){		// and do a slow deceleration
 			if(motionVec[i] > 0.0)
-				motionVec[i] -= 0.05;
+				motionVec[i] -= 0.1;
 			else if(motionVec[i] < 0.0)
-				motionVec[i] += 0.05;
+				motionVec[i] += 0.1;
 		}else{
 			motionVec[i] = 0.0;
 		}
@@ -139,6 +166,7 @@ void cpr_InputKeyboard::GetMotionVec(double * v){
 
 
 //***************************************************************
+// stores the joint values for printing on the screen
 void cpr_InputKeyboard::SetJoints(double * sj, double * cj){
 
 	for (int i=0; i<4; i++ ){
@@ -148,7 +176,33 @@ void cpr_InputKeyboard::SetJoints(double * sj, double * cj){
 
 }
 
+
 //***************************************************************
+// stores the position values for printing on the screen
+void cpr_InputKeyboard::SetPosition(double *sp, double *cp){
+	for (int i=0; i<4; i++ ){
+		setPointPosition[i] = sp[i];
+		currPosition[i] = cp[i];
+	}
+}
+
+
+//***************************************************************
+// adds a message to be shown on the screen
+void cpr_InputKeyboard::SetMessage(string msg){
+
+	messages[indexMsg].clear();
+	messages[indexMsg].append(msg);
+	indexMsg++;
+	if(indexMsg > 4)
+		indexMsg = 0;
+
+	return;
+}
+
+
+//***************************************************************
+// prints the messages on the screen
 void cpr_InputKeyboard::UpdateMessages(){
 
 	mvprintw(12, 2, "Status: %s", statusString.c_str());
@@ -164,6 +218,7 @@ void cpr_InputKeyboard::UpdateMessages(){
 }
 
 //***************************************************************
+// prints the joint controller status on the screen
 void cpr_InputKeyboard::SetStatus(string msg){
 	statusString.clear();
 	statusString.append(msg);
@@ -173,35 +228,24 @@ void cpr_InputKeyboard::SetStatus(string msg){
 	return;
 }
 
-//***************************************************************
-void cpr_InputKeyboard::SetMessage(string msg){
-
-	messages[indexMsg].clear();
-	messages[indexMsg].append(msg);
-	indexMsg++;
-	if(indexMsg > 4)
-		indexMsg = 0;
-
-	UpdateMessages();
-	return;
-}
 
 
 
 //***************************************************************
+// constructor
 cpr_InputKeyboard::cpr_InputKeyboard()
 {
-
 	flagEnable = false;	// initialize the flags
 	flagReset = false;
 	flagZero = false;
+
+	motionType = 0;		// Joint motion first
 
 	(void) initscr();      // init the curses library
 	keypad(stdscr, TRUE);  // enable keyboard mapping
 	(void) nonl();         // tell curses not to do NL->CR/NL on output
 	(void) cbreak();       // take input chars one at a time, no wait for \n ; necessary for moving the robot
 	(void) noecho();        // do not echo input
-
 
 	boost::thread keyThread(keyLoop, (void*)this);		// main loop to read/write the keyboard/screen
 
@@ -216,7 +260,6 @@ cpr_InputKeyboard::cpr_InputKeyboard()
 		messages[i] = ".";
 
 	indexMsg = 0;
-
 }
 
 
