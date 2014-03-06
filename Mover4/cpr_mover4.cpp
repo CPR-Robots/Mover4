@@ -100,13 +100,13 @@ cprMover4HW::cprMover4HW()
 {
 
 	nrOfJoints = 4;
-	jointIDs[0] = 2;		// depending on the robot hardware, these 
+	jointIDs[0] = 16;		// depending on the robot hardware, these 
 					// are the CAN message IDs of the joint modules
 					// When changing IDs also change read-loop test 
 					// in cpr_RS232CAN.cpp
-	jointIDs[1] = 4;
-	jointIDs[2] = 6;
-	jointIDs[3] = 8;
+	jointIDs[1] = 32;
+	jointIDs[2] = 48;
+	jointIDs[3] = 64;
 
 	flagDoComm = true;
 
