@@ -33,7 +33,7 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-// Last change: May 16th, 2013
+// Last change: March 3rd, 2014
 
 #include <math.h>
 #include <stdio.h>
@@ -91,7 +91,7 @@ void cpr_KinematicMover::SetMotionVec(double *vec){
 int cpr_KinematicMover::moveJoint(){
 
 	for(int i=0; i<4; i++){
-		setPointState.j[i] += 0.4 * motionVec[i];
+		setPointState.j[i] += 0.1 * motionVec[i];
 	}
 	forwardKin(setPointState);
 
@@ -111,7 +111,7 @@ int cpr_KinematicMover::moveJoint(){
 int cpr_KinematicMover::moveCart(){
 	
 	for(int i=0; i<4; i++){
-		setPointState.p[i] += 1.5 * motionVec[i];
+		setPointState.p[i] += 1.0 * motionVec[i];
 	}
 	inverseKin(setPointState);
 

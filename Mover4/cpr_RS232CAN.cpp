@@ -164,7 +164,7 @@ bool cpr_RS232CAN::Connect(void )
 	}
 
 	keys->SetMessage(s);
-	boost::thread readThread(readLoop, (void*)this);
+	//boost::thread readThread(readLoop, (void*)this);
 
 	return true;
 }
@@ -228,7 +228,7 @@ int cpr_RS232CAN::EvaluateBuffer(char* buf){
 
 
 //***************************************************************
-void cpr_RS232CAN::WriteMsg(int id, int length, char* data)
+void cpr_RS232CAN::WriteMsg(int id, int length, char* data, bool waitForAnswer)
 {
 
 	unsigned char commands[11] = {16, 4, 4, 125, 125, 0,0,0,0,0, 19};
@@ -246,12 +246,26 @@ void cpr_RS232CAN::WriteMsg(int id, int length, char* data)
 
 	if(active)
 		boost::asio::write(*port, boost::asio::buffer(commands, 11));
+		
+	if(waitForAnswer)
+		TryRead();
 
 	//std::cerr << "write: "<<id<<"\n";
+
+
 	return;
 }
 
 
+//***************************************************************
+void cpr_RS232CAN::TryRead(){
+
+    	char bu[11];
+	if(active){
+		boost::asio::read(*port, boost::asio::buffer(bu, 11));
+		EvaluateBuffer(bu);
+	}
+}
 
 
 //***************************************************************

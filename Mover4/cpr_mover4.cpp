@@ -1,7 +1,7 @@
 /*********************************************************************
  * Software License Agreement (BSD License)
  *
- *  Copyright (c) 2012-13, Commonplace Robotics GmbH
+ *  Copyright (c) 2012-14, Commonplace Robotics GmbH
  *  http://www.commonplacerobotics.com
  *  All rights reserved.
  *
@@ -35,27 +35,8 @@
 
 /*
  * Mover4
- * Version 0.5	   May 16th, 2013    info@cpr-robots.com
- *
- * Test program to show how to interface with the Commonplace Robotics Mover4 robot arm
- * Necessary hardware: USB2CAN adapter and Mover4 robot arm, both available via www.cpr-robots.com
- * The program has to be started in a terminal window.
- * Written and tested on Ubuntu 11.10, gcc
- * Libraries: boost, ncurses
- *
- * Functionalities: 
- * 	- establish a connection to the robot via a virtual com port of the USB2CAN driver. (to be set in cpr_RS232CAN.cpp, preset is /dev/ttyUSB0)
- * 	- establish a communication loop, Joint positions are read and set, motors can be reset, enabled and zeroed
- * 	- move the single joints or cartesian directions with the keyboard
- *
- * Usage:
- * 1. Start with ./Mover4
- * 2. Reset Errors and load current joint values with 'p' (maybe press space to update the screen)
- * 3. Enable Motors with 'o'
- * 4. Move Robot with 'q' to 'f' in joint mode
- * 5. Or move the robot with 'z' to 'k' in cartesian mode. XYZ can be set, B stay in at the current value.
- * 6. If necessary set joints to zero with 'z', afterwards again reset and enable the motors
- *
+ * Version 0.6	   March 3rd, 2014    info@cpr-robots.com
+ * Please see the readme file
  * ToDo: This program is only a communication demo, not a usable robot interface. E.g. thread safety is completely missing up till now.
  */
 
@@ -72,7 +53,8 @@
 #include <iostream>
 
 
-#include "cpr_RS232CAN.h"
+#include "cpr_PCAN.h"
+//#include "cpr_RS232CAN.h"
 #include "cpr_KinematicMover.h"
 #include "cpr_InputKeyboard.h"
 
@@ -97,7 +79,8 @@ private:
 	void Wait(int ms);
 
 	cpr_KinematicMover kin;		// stores the robot joint position and does kinematic computations
-	cpr_RS232CAN itf;		// provides the hardware interface to the robots CAN bus via a virtual com port
+	cpr_PCAN itf;		// provides the hardware interface to the robots CAN bus via a virtual com port
+	//cpr_RS232CAN itf;		// provides the hardware interface to the robots CAN bus via a virtual com port
 	cpr_InputKeyboard keyboard;	// reads keys to move the joints; a minimal interface
 
 	robotState state;
@@ -117,13 +100,13 @@ cprMover4HW::cprMover4HW()
 {
 
 	nrOfJoints = 4;
-	jointIDs[0] = 16;		// depending on the robot hardware, these 
+	jointIDs[0] = 2;		// depending on the robot hardware, these 
 					// are the CAN message IDs of the joint modules
 					// When changing IDs also change read-loop test 
 					// in cpr_RS232CAN.cpp
-	jointIDs[1] = 32;
-	jointIDs[2] = 48;
-	jointIDs[3] = 64;
+	jointIDs[1] = 4;
+	jointIDs[2] = 6;
+	jointIDs[3] = 8;
 
 	flagDoComm = true;
 
@@ -180,7 +163,7 @@ void cprMover4HW::DoComm(){
 			tics = kin.computeTics(i, kin.setPointState.j[i]);	// get the tics out of the joint position in degree
 			data[2] = tics / 256;					// Joint Position High Byte
 			data[3] = tics % 256;					// Joint Position Low Byte
-			itf.WriteMsg(jointIDs[i], l, data);			// write the message to the joint controller
+			itf.WriteMsg(jointIDs[i], l, data, true);			// write the message to the joint controller
 			Wait(5);						// wait a short time to avoid a crowded bus
 		}
 	}
@@ -219,8 +202,10 @@ void cprMover4HW::ResetJointsToZero(){
 	DisableMotors();			// otherwise the robot will make a jump afterwards (until the lag error stops him)
 
 	for(int i=0; i<nrOfJoints; i++){
-		itf.WriteMsg(jointIDs[i], l, data);
-		Wait(6);
+		itf.WriteMsg(jointIDs[i], l, data, false);	// first reset command.. but thats not sufficient
+		Wait(5);
+		itf.WriteMsg(jointIDs[i], l, data, false);	// the command has to be sent twice in the time of two seconds to take effect
+		Wait(5);
 	}
 	keyboard.SetMessage("Joints set to zero");
 
@@ -247,7 +232,7 @@ void cprMover4HW::ResetError(){
 	
 	// then reset the errors
 	for(int i=0; i<nrOfJoints; i++){
-		itf.WriteMsg(jointIDs[i], l, data);
+		itf.WriteMsg(jointIDs[i], l, data, false);
 		Wait(3);
 	}
 	keyboard.SetMessage("Error reset");
@@ -263,7 +248,7 @@ void cprMover4HW::EnableMotors(){
 	char data[8] = {1, 9, 0, 0, 0, 0, 0};		// CAN message to enable the motors
 	flagDoComm = false;
 	for(int i=0; i<nrOfJoints; i++){
-		itf.WriteMsg(jointIDs[i], l, data);
+		itf.WriteMsg(jointIDs[i], l, data, false);
 		Wait(3);
 	}
 	keyboard.SetMessage("Motors enabled");
@@ -277,7 +262,7 @@ void cprMover4HW::DisableMotors(){
 	char data[8] = {1, 10, 0, 0, 0, 0, 0};		// CAN message to disable the motors
 	flagDoComm = false;
 	for(int i=0; i<nrOfJoints; i++){
-		itf.WriteMsg(jointIDs[i], l, data);
+		itf.WriteMsg(jointIDs[i], l, data, false);
 		Wait(3);
 	}
 	keyboard.SetMessage("Motors disabled");

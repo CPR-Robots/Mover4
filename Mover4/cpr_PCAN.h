@@ -1,7 +1,7 @@
 /*********************************************************************
  * Software License Agreement (BSD License)
  *
- *  Copyright (c) 2012, Commonplace Robotics GmbH
+ *  Copyright (c) 2014, Commonplace Robotics GmbH
  *  http://www.commonplacerobotics.com
  *  All rights reserved.
  *
@@ -45,30 +45,24 @@
 using namespace::boost::asio;
 
 #include "cpr_InputKeyboard.h"
-
-//#include <ros/ros.h>
-//#include <geometry_msgs/Twist.h>
-//#include <sensor_msgs/JointState.h>
-
+#include "libpcan.h"
 
 
 struct msg{
 	int id;				// message id
 	int length;			// length of data part
-	char data[8];		// data
+	char data[8];			// data
 	long time;			// receive time
 };
 
 
-class cpr_RS232CAN
+class cpr_PCAN
 {
 public:
-  	cpr_RS232CAN();
+  	cpr_PCAN();
 	bool Connect(void);
 	bool Disconnect(void);
 	void WriteMsg(int id, int length, char* data, bool waitForAnswer);
-	void TryRead();
-	int EvaluateBuffer(char* buf);
 	int GetMsg(int id, int *length, char* data);
 
 	msg msgBuffer[256];
@@ -76,11 +70,10 @@ public:
 	cpr_InputKeyboard * keys;
   	
 
+	HANDLE h;					// handle to the PCAN interface
 
-	bool active; // remains true while this object is still operating
-	boost::asio::serial_port *port; // the serial port this instance is connected to
-//	char read_msg_[max_read_length]; // data read from the socket
-	//deque<char> write_msgs_; // buffered write data
+	bool active; 					// remains true while this object is still operating
+
   	
 private:
   
